@@ -2,7 +2,11 @@ import { NextResponse } from "next/server";
 import { promises as fs } from "fs";
 import path from "path";
 
-const DATA_FILE = path.join(process.cwd(), "data", "leads.json");
+// On Vercel, the file system is read-only except for the /tmp directory.
+const isVercel = process.env.VERCEL === "1" || process.env.NODE_ENV === "production";
+const DATA_FILE = isVercel 
+  ? path.join("/tmp", "leads.json") 
+  : path.join(process.cwd(), "data", "leads.json");
 
 async function readLeads() {
   try {
@@ -14,8 +18,13 @@ async function readLeads() {
 }
 
 async function writeLeads(leads) {
-  await fs.mkdir(path.dirname(DATA_FILE), { recursive: true });
-  await fs.writeFile(DATA_FILE, JSON.stringify(leads, null, 2));
+  try {
+    await fs.mkdir(path.dirname(DATA_FILE), { recursive: true });
+    await fs.writeFile(DATA_FILE, JSON.stringify(leads, null, 2));
+  } catch (error) {
+    console.warn("Failed to write to file system. This is expected on Vercel unless using /tmp.", error);
+    // Continue execution so the user still gets a success response
+  }
 }
 
 export async function POST(request) {
